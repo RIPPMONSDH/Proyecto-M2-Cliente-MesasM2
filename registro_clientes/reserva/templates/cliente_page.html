@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Clientes</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background:#f4f6f9; }
+        .main-container { max-width:1000px; margin:32px auto; }
+        .form-col { max-width:420px; }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Clientes</h1>
+        <a class="btn btn-outline-secondary" href="{% url 'home' %}">Inicio</a>
+    </div>
+
+    <div class="d-flex justify-content-end mb-3">
+        <a class="btn btn-secondary" href="{% url 'reservas' %}">📅 Ir a Reservas</a>
+    </div>
+
+{% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+{% endif %}
+
+<div class="row">
+    <div class="col form-col">
+        <div class="card p-3 mb-4">
+            <h4>{% if editing %}Editar Cliente{% else %}Nuevo Cliente{% endif %}</h4>
+            <form method="post">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="mb-3">
+                    {{ form.nombre.label_tag }}
+                    {{ form.nombre }}
+                    {% if form.nombre.errors %}
+                        <div class="text-danger small">{{ form.nombre.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.fecha_nacimiento.label_tag }}
+                    {{ form.fecha_nacimiento }}
+                    {% if form.fecha_nacimiento.errors %}
+                        <div class="text-danger small">{{ form.fecha_nacimiento.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.email.label_tag }}
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                        <div class="text-danger small">{{ form.email.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.telefono.label_tag }}
+                    {{ form.telefono }}
+                    {% if form.telefono.errors %}
+                        <div class="text-danger small">{{ form.telefono.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success">{% if editing %}Actualizar{% else %}Guardar{% endif %}</button>
+                    {% if editing %}
+                    <a href="{% url 'clientes' %}" class="btn btn-secondary">Cancelar</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="col">
+        <table class="table table-striped table-hover">
+    <thead class="table-dark">
+        <tr>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Teléfono</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for c in clientes %}
+        <tr>
+            <td>{{ c.nombre }}</td>
+            <td>{{ c.email }}</td>
+            <td>{{ c.telefono|default:"-" }}</td>
+            <td>
+                <a href="{% url 'editar_cliente' c.pk %}" class="btn btn-warning btn-sm">Editar</a>
+                <a href="{% url 'eliminar_cliente' c.pk %}"
+                    onclick="return confirm('¿Eliminar este cliente?')"
+                    class="btn btn-danger btn-sm">Eliminar</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
