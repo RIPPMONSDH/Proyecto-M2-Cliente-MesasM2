@@ -33,9 +33,11 @@ urlpatterns = [
     path('api/v1/', include(router.urls)),
 
     # Rutas Visuales (Para Modulo 2)
-    path('', views.home, name='home'),
+    path('', views.inicio, name='inicio'),
+    path('home/', views.home, name='home'),
     path('Cliente/', views.lista_clientes, name='lista_clientes'),
     path('Cliente/nuevo/', views.registrar_cliente, name='registrar_cliente'),
+    path('Cliente/<int:cliente_id>/editar/', views.editar_cliente, name='editar_cliente'),
     path('Cliente/<int:cliente_id>/elegir_mesa/', views.elegir_mesa_para_cliente, name='elegir_mesa_para_cliente'),
     path('Cliente/<int:cliente_id>/asignar/<int:mesa_id>/', views.asignar_cliente_mesa, name='asignar_cliente_mesa'),
     path('Mesa/<int:mesa_id>/asignar/', views.asignar_mesa, name='asignar_mesa'),

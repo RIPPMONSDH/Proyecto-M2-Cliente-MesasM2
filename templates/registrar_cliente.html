@@ -5,7 +5,9 @@
     <div class="col-md-8 col-lg-6">
         <div class="card shadow">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="bi bi-person-plus-fill"></i> Registrar Nuevo Cliente</h4>
+                <h4 class="mb-0"><i class="bi bi-person-plus-fill"></i>
+                    {% if cliente %}Editar Cliente{% else %}Registrar Nuevo Cliente{% endif %}
+                </h4>
             </div>
             <div class="card-body p-4">
                 <form method="POST">
@@ -13,18 +15,29 @@
                     
                     <div class="mb-3">
                         <label for="nombre" class="form-label">Nombre Completo *</label>
-                        <input type="text" class="form-control" id="nombre" name="nombre" required placeholder="Ej: Juan Pérez">
+                        <input type="text" class="form-control" id="nombre" name="nombre" required placeholder="Ej: Juan Pérez" value="{% if cliente %}{{ cliente.nombre }}{% endif %}">
                     </div>
                     
                     <div class="mb-3">
                         <label for="telefono" class="form-label">Teléfono *</label>
-                        <input type="tel" class="form-control" id="telefono" name="telefono" required placeholder="+56 9 1234 5678">
+                        <input type="tel" class="form-control" id="telefono" name="telefono" required placeholder="+56 9 1234 5678" value="{% if cliente %}{{ cliente.telefono }}{% endif %}">
                         <div class="form-text">Debe ser único en el sistema.</div>
                     </div>
 
                     <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" placeholder="ejemplo@correo.com" value="{% if cliente %}{{ cliente.email }}{% endif %}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento</label>
+                        <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento" placeholder="YYYY-MM-DD" value="{% if cliente and cliente.fecha_nacimiento %}{{ cliente.fecha_nacimiento }}{% endif %}">
+                        <div class="form-text">Si el cliente es menor de 18 años no podrá realizar reservas.</div>
+                    </div>
+
+                    <div class="mb-3">
                         <label for="notas" class="form-label">Notas / Preferencias</label>
-                        <textarea class="form-control" id="notas" name="notas" rows="3" placeholder="Ej: Alérgico a las nueces, prefiere terraza..."></textarea>
+                        <textarea class="form-control" id="notas" name="notas" rows="3" placeholder="Ej: Alérgico a las nueces, prefiere terraza...">{% if cliente %}{{ cliente.notas }}{% endif %}</textarea>
                     </div>
 
                     <div class="d-grid gap-2">

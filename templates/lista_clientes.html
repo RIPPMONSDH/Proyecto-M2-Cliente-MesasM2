@@ -35,10 +35,10 @@
                 <td class="fw-bold">{{ cliente.nombre }}</td>
                 <td>{{ cliente.telefono }}</td>
                 <td>{{ cliente.notas|default:"-" }}</td>
-                <td>
-                    <a href="#" class="btn btn-sm btn-outline-primary">Ver Perfil</a>
-                    <a href="{% url 'elegir_mesa_para_cliente' cliente.id %}" class="btn btn-sm btn-outline-success ms-2">Asignar a Mesa</a>
-                </td>
+                    <td>
+                        <a href="{% url 'editar_cliente' cliente.id %}" class="btn btn-sm btn-outline-primary">Editar</a>
+                        <a href="{% url 'elegir_mesa_para_cliente' cliente.id %}" class="btn btn-sm btn-outline-success ms-2">Asignar a Mesa</a>
+                    </td>
             </tr>
             {% empty %}
             <tr>

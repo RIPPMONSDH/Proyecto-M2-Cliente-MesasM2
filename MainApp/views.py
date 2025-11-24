@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Q
 from datetime import timedelta
 from datetime import datetime
 
@@ -68,6 +69,11 @@ def home(request):
         'total': total,
         'clientes': clientes_recientes,
     })
+# Página de inicio (landing) con botones grandes
+def inicio(request):
+    """Landing inicial con botones grandes: Ver Mesas, Ver Clientes, Crear Cliente"""
+    return render(request, 'inicio.html')
+
 
 # Registrar Cliente 
 def registrar_cliente(request):
@@ -75,10 +81,22 @@ def registrar_cliente(request):
         nombre = request.POST.get('nombre')
         telefono = request.POST.get('telefono')
         notas = request.POST.get('notas')
-        
+        email = request.POST.get('email')
+        fecha_nacimiento = request.POST.get('fecha_nacimiento')
+
         if nombre and telefono:
             try:
-                Cliente.objects.create(nombre=nombre, telefono=telefono, notas=notas)
+                fecha_obj = None
+                if fecha_nacimiento:
+                    fecha_obj = datetime.strptime(fecha_nacimiento, "%Y-%m-%d").date()
+
+                Cliente.objects.create(
+                    nombre=nombre,
+                    telefono=telefono,
+                    notas=notas,
+                    email=email or None,
+                    fecha_nacimiento=fecha_obj,
+                )
                 messages.success(request, f'✅ Cliente {nombre} registrado correctamente.')
                 return redirect('lista_clientes')
             except Exception as e:
@@ -97,6 +115,39 @@ def lista_clientes(request):
         clientes = Cliente.objects.all().order_by('-id')[:20]
         
     return render(request, 'lista_clientes.html', {'clientes': clientes})
+
+
+# Editar Cliente
+def editar_cliente(request, cliente_id):
+    cliente = get_object_or_404(Cliente, id=cliente_id)
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre')
+        telefono = request.POST.get('telefono')
+        notas = request.POST.get('notas')
+        email = request.POST.get('email')
+        fecha_nacimiento = request.POST.get('fecha_nacimiento')
+
+        if nombre and telefono:
+            try:
+                fecha_obj = None
+                if fecha_nacimiento:
+                    fecha_obj = datetime.strptime(fecha_nacimiento, "%Y-%m-%d").date()
+
+                cliente.nombre = nombre
+                cliente.telefono = telefono
+                cliente.notas = notas
+                cliente.email = email or None
+                cliente.fecha_nacimiento = fecha_obj
+                cliente.save()
+
+                messages.success(request, f'✅ Cliente {cliente.nombre} actualizado correctamente.')
+                return redirect('lista_clientes')
+            except Exception as e:
+                messages.error(request, '❌ Error al actualizar el cliente. Verifica los datos.')
+        else:
+            messages.error(request, '❌ Nombre y Teléfono son obligatorios.')
+
+    return render(request, 'registrar_cliente.html', {'cliente': cliente})
 
 
 # Mostrar mesas libres para asignar a un cliente específico
@@ -133,7 +184,7 @@ def asignar_cliente_mesa(request, cliente_id, mesa_id):
                 estado='LLEGO'
             )
 
-        messages.success(request, f'✅ {cliente.nombre} asignado a Mesa {mesa.numero}.')
+        messages.success(request, f' {cliente.nombre} asignado a Mesa {mesa.numero}.')
         return redirect('lista_clientes')
 
     return redirect('elegir_mesa_para_cliente', cliente_id=cliente.id)
@@ -152,10 +203,10 @@ def asignar_mesa(request, mesa_id):
             # Podrías llamar a la API de M3 para crear el pedido automáticamente
             # requests.post('http://api-m3/crear_pedido', data={...})
             
-            messages.success(request, f'✅ Mesa {mesa.numero} asignada. Estado: OCUPADA.')
+            messages.success(request, f' Mesa {mesa.numero} asignada. Estado: OCUPADA.')
             return redirect('home')
         else:
-            messages.error(request, '❌ La mesa no está libre.')
+            messages.error(request, ' La mesa no está libre.')
             
     return render(request, 'asignar_mesa.html', {'mesa': mesa})
 
@@ -169,6 +220,15 @@ def liberar_mesa(request, mesa_id):
             mesa.estado = 'LIMPIEZA'
             mesa.save()
             messages.info(request, f'🧹 Mesa {mesa.numero} enviada a LIMPIEZA. Marca limpieza completada cuando esté lista.')
+            # Desvincular reservas activas para que no aparezca el nombre del cliente
+            today = timezone.localtime(timezone.now()).date()
+            now_time = timezone.localtime(timezone.now()).time()
+            reservas = Reserva.objects.filter(mesa_asignada=mesa, fecha=today).filter(
+                Q(estado='LLEGO') | (Q(hora_inicio__lte=now_time) & Q(hora_fin__gt=now_time))
+            )
+            for r in reservas:
+                r.mesa_asignada = None
+                r.save()
 
         return redirect('home')
         
@@ -182,6 +242,15 @@ def finalizar_limpieza(request, mesa_id):
             mesa.estado = 'LIBRE'
             mesa.save()
             messages.success(request, f'✅ Mesa {mesa.numero} ahora está LIBRE.')
+            # Al finalizar limpieza también desvincular reservas activas antiguas
+            today = timezone.localtime(timezone.now()).date()
+            now_time = timezone.localtime(timezone.now()).time()
+            reservas = Reserva.objects.filter(mesa_asignada=mesa, fecha=today).filter(
+                Q(estado='LLEGO') | (Q(hora_inicio__lte=now_time) & Q(hora_fin__gt=now_time))
+            )
+            for r in reservas:
+                r.mesa_asignada = None
+                r.save()
         else:
             messages.error(request, 'La mesa no está en limpieza.')
 
@@ -262,6 +331,12 @@ def crear_reserva(request):
             # Parsear inicio y fin
             # Parsear fecha y horas
             fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
+            # Bloquear reservas si el cliente es menor de edad (si tenemos fecha de nacimiento)
+            if cliente.fecha_nacimiento:
+                edad = fecha_obj.year - cliente.fecha_nacimiento.year - ((fecha_obj.month, fecha_obj.day) < (cliente.fecha_nacimiento.month, cliente.fecha_nacimiento.day))
+                if edad < 18:
+                    messages.error(request, '❌ El cliente es menor de edad y no puede reservar.')
+                    return render(request, 'reserva_form.html', {'clientes': clientes, 'mesas': mesas})
             hora_inicio_obj = datetime.strptime(hora_inicio, "%H:%M").time()
             hora_fin_obj = datetime.strptime(hora_fin, "%H:%M").time()
 

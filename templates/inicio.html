@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex flex-column align-items-center justify-content-center" style="min-height:60vh; gap:1.5rem;">
+    <h1 class="display-4">Bienvenido a Cliente Mesas</h1>
+
+    <div class="d-grid gap-3 col-6 mx-auto">
+        <a href="{% url 'home' %}" class="btn btn-primary btn-lg py-4">Ver Mesas y Reservas</a>
+        <a href="{% url 'lista_clientes' %}" class="btn btn-success btn-lg py-4">Ver Clientes Registrados</a>
+        <a href="{% url 'registrar_cliente' %}" class="btn btn-outline-primary btn-lg py-4">Crear Cliente Nuevo</a>
+    </div>
+</div>
+{% endblock %}

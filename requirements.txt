@@ -1,0 +1,4 @@
+Django==5.2.5
+djangorestframework
+django-phonenumber-field
+phonenumbers

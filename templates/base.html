@@ -20,13 +20,16 @@
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'home' %}">🍽️ Host Service (M2)</a>
+            <a class="navbar-brand" href="{% url 'inicio' %}">🍽️ Host Service (M2)</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Plano de Mesas</a></li>
+                    <li class="nav-item d-flex align-items-center">
+                        <a class="nav-link" href="{% url 'home' %}">Plano de Mesas</a>
+                        <a class="nav-link ps-2" href="{% url 'inicio' %}"><strong>Inicio</strong></a>
+                    </li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'lista_clientes' %}">Clientes</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'registrar_cliente' %}">Registrar Nuevo</a></li>
                 </ul>
