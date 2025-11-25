@@ -2,25 +2,24 @@
 
 {% block content %}
 <div class="row justify-content-center mt-5">
-    <div class="col-md-6">
+    <div class="col-md-5 text-center">
         <div class="card border-danger shadow">
-            <div class="card-header bg-danger text-white text-center">
-                <h3 class="mb-0">Liberar Mesa {{ mesa.numero }}</h3>
-            </div>
-            <div class="card-body p-5 text-center">
-                <div class="mb-4">
-                    <i class="bi bi-exclamation-triangle text-warning display-1"></i>
+            <div class="card-body p-5">
+                <div class="text-danger mb-3">
+                    <i class="bi bi-box-arrow-right display-1"></i>
                 </div>
                 
-                <h4>¿El cliente ha pagado y se ha retirado?</h4>
-                <p class="text-muted mb-4">Al confirmar, la mesa pasará a estado de <strong>LIMPIEZA</strong>. Marca la limpieza como completada cuando el personal termine la limpieza.</p>
+                <h2 class="mb-3">¿Liberar Mesa {{ mesa.numero }}?</h2>
+                <p class="lead mb-4">Confirma que el cliente ha pagado y la mesa está vacía.</p>
                 
-                <form method="POST" class="d-flex justify-content-center gap-3">
+                <div class="alert alert-warning py-2 small">
+                    <i class="bi bi-info-circle"></i> La mesa pasará a estado <strong>LIMPIEZA</strong> automáticamente.
+                </div>
+                
+                <form method="POST" class="d-grid gap-2 mt-4">
                     {% csrf_token %}
-                    <a href="{% url 'home' %}" class="btn btn-secondary btn-lg px-4">Cancelar</a>
-                    <button type="submit" class="btn btn-danger btn-lg px-4">
-                        <i class="bi bi-trash-fill"></i> Sí, Liberar Mesa
-                    </button>
+                    <button type="submit" class="btn btn-danger btn-lg">Sí, Liberar Mesa</button>
+                    <a href="{% url 'home' %}" class="btn btn-outline-secondary">Cancelar</a>
                 </form>
             </div>
         </div>

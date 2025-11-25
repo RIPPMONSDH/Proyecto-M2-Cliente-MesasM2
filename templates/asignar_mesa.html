@@ -4,30 +4,51 @@
 <div class="row justify-content-center mt-5">
     <div class="col-md-6">
         <div class="card border-success shadow">
-            <div class="card-header bg-success text-white text-center">
-                <h3 class="mb-0">Asignar Mesa {{ mesa.numero }}</h3>
+            <div class="card-header bg-success text-white py-3">
+                <h4 class="mb-0"><i class="bi bi-box-arrow-in-down"></i> Asignar Mesa {{ mesa.numero }}</h4>
             </div>
-            <div class="card-body p-4 text-center">
-                <h5 class="text-muted mb-4">Capacidad: {{ mesa.capacidad }} personas | Ubicación: {{ mesa.ubicacion }}</h5>
+            <div class="card-body p-4">
                 
-                <p class="lead">¿Confirmar asignación inmediata para clientes presentes (Walk-in)?</p>
-                
-                <form method="POST" class="d-grid gap-2 col-8 mx-auto">
-                    {% csrf_token %}
-                    <input type="hidden" name="tipo" value="walkin">
-                    
-                    <button type="submit" class="btn btn-success btn-lg py-3">
-                        <i class="bi bi-check-circle-fill"></i> CONFIRMAR ASIGNACIÓN
-                    </button>
-                    
-                    <a href="{% url 'home' %}" class="btn btn-outline-secondary">Cancelar</a>
-                </form>
-                
-                <hr class="my-4">
-                
-                <div class="alert alert-info text-start">
-                    <small><i class="bi bi-info-circle"></i> En futuras versiones podrás asignar esta mesa a una reserva específica desde aquí.</small>
+                <div class="alert alert-light border d-flex align-items-center mb-4">
+                    <i class="bi bi-info-circle-fill text-success fs-3 me-3"></i>
+                    <div>
+                        <strong>Detalles de la Mesa:</strong><br>
+                        Capacidad: {{ mesa.capacidad }} pax | Ubicación: {{ mesa.get_ubicacion_display }}
+                    </div>
                 </div>
+
+                <form method="POST">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Seleccionar Cliente</label>
+                        <select name="cliente_id" class="form-select form-select-lg" required size="5">
+                            {% for c in clientes %}
+                                <option value="{{ c.id }}">
+                                    {{ c.nombre }} {% if c.telefono %}({{ c.telefono }}){% endif %}
+                                </option>
+                            {% empty %}
+                                <option disabled>No hay clientes registrados.</option>
+                            {% endfor %}
+                        </select>
+                        <div class="mt-2 text-end">
+                            <a href="{% url 'registrar_cliente' %}" class="small text-decoration-none">
+                                <i class="bi bi-plus-circle"></i> Registrar nuevo cliente
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Personas Reales (Ocupación)</label>
+                        <input type="number" name="personas" class="form-control" value="1" min="1" max="{{ mesa.capacidad }}">
+                        <div class="form-text">No puede exceder la capacidad de la mesa ({{ mesa.capacidad }}).</div>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-success btn-lg">Confirmar Asignación</button>
+                        <a href="{% url 'home' %}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

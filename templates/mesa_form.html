@@ -1,34 +1,41 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row justify-content-center mt-4">
-  <div class="col-md-6">
-    <div class="card">
-      <div class="card-header">
-        <h5 class="mb-0">{% if mesa %}Editar Mesa {{ mesa.numero }}{% else %}Crear Nueva Mesa{% endif %}</h5>
-      </div>
-      <div class="card-body">
-        <form method="POST">
-          {% csrf_token %}
-          <div class="mb-3">
-            <label class="form-label">Número</label>
-            <input name="numero" class="form-control" required value="{% if mesa %}{{ mesa.numero }}{% endif %}">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Capacidad</label>
-            <input name="capacidad" class="form-control" required value="{% if mesa %}{{ mesa.capacidad }}{% endif %}">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Ubicación</label>
-            <input name="ubicacion" class="form-control" value="{% if mesa %}{{ mesa.ubicacion }}{% endif %}">
-          </div>
-          <div class="d-flex justify-content-end">
-            <a href="{% url 'home' %}" class="btn btn-outline-secondary me-2">Cancelar</a>
-            <button class="btn btn-primary">Guardar</button>
-          </div>
-        </form>
-      </div>
+<div class="row justify-content-center mt-5">
+    <div class="col-md-5">
+        <div class="card shadow border-0">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">{{ titulo|default:"Gestión de Mesa" }}</h5>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Número de Mesa</label>
+                        {{ form.numero }}
+                        <div class="text-danger small">{{ form.numero.errors }}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Capacidad (Personas)</label>
+                        {{ form.capacidad }}
+                        <div class="text-danger small">{{ form.capacidad.errors }}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Ubicación</label>
+                        {{ form.ubicacion }}
+                        <div class="text-danger small">{{ form.ubicacion.errors }}</div>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button class="btn btn-primary">Guardar Configuración</button>
+                        <a href="{% url 'home' %}" class="btn btn-outline-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
 {% endblock %}

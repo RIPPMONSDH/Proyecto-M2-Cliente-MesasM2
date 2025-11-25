@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block content %}
+<a href="{% url 'home' %}" class="btn btn-sm btn-secondary mb-3">Volver</a>
+<h3>Historial Mesa {{ mesa.numero }}</h3>
+
+<div class="row my-3 text-center">
+    <div class="col-md-3">
+        <div class="card p-3 bg-light h-100">
+            <h6 class="text-muted">Rotaciones</h6>
+            <h2>{{ metricas.rotacion }}</h2>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 bg-light h-100">
+            <h6 class="text-muted">Tiempo Prom.</h6>
+            <h2>{{ metricas.promedio }} <small class="fs-6">min</small></h2>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 bg-light h-100">
+            <h6 class="text-muted">Consumo Prom.</h6>
+            <h2 class="text-success">${{ metricas.consumo_prom }}</h2>
+        </div>
+    </div>
+    <div class="col-md-3 d-flex align-items-center justify-content-center">
+        <a href="{% url 'exportar_historial_csv' mesa.id %}" class="btn btn-success w-100">Exportar CSV</a>
+    </div>
+</div>
+
+<table class="table table-striped mt-4">
+    <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Cliente</th>
+            <th>Entrada</th>
+            <th>Salida</th>
+            <th>Minutos</th>
+            <th>Pax</th>
+            <th>Consumo</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for o in ocupaciones %}
+        <tr>
+            <td>{{ o.fecha }}</td>
+            <td>{{ o.cliente.nombre|default:"Walk-in" }}</td>
+            <td>{{ o.hora_entrada|date:"H:i" }}</td>
+            <td>{{ o.hora_salida|date:"H:i"|default:"Activo" }}</td>
+            <td>{{ o.duracion_minutos }}</td>
+            <td>{{ o.cantidad_personas }}</td>
+            <td>${{ o.consumo_total }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

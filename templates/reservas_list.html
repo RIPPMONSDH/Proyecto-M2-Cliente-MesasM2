@@ -1,62 +1,87 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row mb-3">
-  <div class="col-md-8">
-    <h3>Reservas</h3>
-    <p class="text-muted">Lista y filtros</p>
-  </div>
-  <div class="col-md-4 text-end">
-    <a href="{% url 'crear_reserva' %}" class="btn btn-success">Nueva Reserva</a>
-  </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Reservas del Día</h2>
+    <a href="{% url 'crear_reserva' %}" class="btn btn-primary">Nueva Reserva</a>
 </div>
 
-<div class="card mb-3">
-  <div class="card-body">
-    <form method="GET" class="row g-2 align-items-end">
-      <div class="col-md-3">
-        <label class="form-label">Fecha</label>
-        <input type="date" name="fecha" class="form-control" value="{{ filtros.fecha }}">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Cliente</label>
-        <select name="cliente" class="form-select">
-          <option value="">Todos</option>
-          {% for c in clientes %}
-            <option value="{{ c.id }}" {% if filtros.cliente == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nombre }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Estado</label>
-        <select name="estado" class="form-select">
-          <option value="">Todos</option>
-          <option value="CONFIRMADA" {% if filtros.estado == 'CONFIRMADA' %}selected{% endif %}>Confirmada</option>
-          <option value="LLEGO" {% if filtros.estado == 'LLEGO' %}selected{% endif %}>Cliente Llegó</option>
-          <option value="CANCELADA" {% if filtros.estado == 'CANCELADA' %}selected{% endif %}>Cancelada</option>
-        </select>
-      </div>
-      <div class="col-md-2 text-end">
-        <button class="btn btn-primary">Filtrar</button>
-      </div>
+<div class="card mb-3 bg-light p-3 border-0">
+    <form method="GET" class="d-flex gap-2 align-items-center">
+        <label>Fecha:</label>
+        <input type="date" name="fecha" class="form-control w-auto" value="{{ fecha_filtro }}">
+        <button class="btn btn-dark">Ver</button>
     </form>
-  </div>
 </div>
 
-<div class="list-group">
-  {% for r in reservas %}
-    <div class="list-group-item d-flex justify-content-between align-items-center">
-      <div>
-        <div class="fw-bold">{{ r.cliente.nombre }} — Mesa: {% if r.mesa_asignada %}{{ r.mesa_asignada.numero }}{% else %}-{% endif %}</div>
-          <div class="text-muted">{{ r.fecha|date:'Y-m-d' }} • {{ r.hora_inicio|date:'H:i' }} → {{ r.hora_fin|date:'H:i' }} • {{ r.cantidad_personas }} pax • Estado: {{ r.get_estado_display }}</div>
-      </div>
-      <div>
-        <a href="#" class="btn btn-sm btn-outline-secondary">Ver</a>
-      </div>
-    </div>
-  {% empty %}
-    <div class="list-group-item text-muted">No hay reservas para la fecha seleccionada.</div>
-  {% endfor %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Hora</th>
+                <th>Cliente</th>
+                <th>Mesa</th>
+                <th>Pax</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in reservas %}
+            <tr class="{% if r.is_late %}table-danger{% endif %}">
+                <td class="fw-bold">{{ r.hora_inicio|date:"H:i" }}</td>
+                <td>
+                    {{ r.cliente.nombre }} <br>
+                    <small class="text-muted">{{ r.cliente.telefono }}</small>
+                </td>
+                <td>
+                    {% if r.mesa_asignada %}
+                        {% if r.mesa_asignada.estado == 'FUERA_SERVICIO' %}
+                            <span class="badge bg-danger" title="Mesa Fuera de Servicio">
+                                <i class="bi bi-exclamation-triangle-fill"></i> M{{ r.mesa_asignada.numero }} (F/S)
+                            </span>
+                        {% else %}
+                            <span class="badge bg-primary">M{{ r.mesa_asignada.numero }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>{{ r.cantidad_personas }}</td>
+                <td>
+                    {% if r.estado == 'CONFIRMADA' %}
+                        <span class="badge bg-success">Confirmada</span>
+                    {% else %}
+                        {% if r.estado == 'LLEGO' %}
+                            <span class="badge bg-primary">Llegó</span>
+                        {% else %}
+                            {% if r.estado == 'CANCELADA' %}
+                                <span class="badge bg-secondary">Cancelada</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ r.get_estado_display }}</span>
+                            {% endif %}
+                        {% endif %}
+                    {% endif %}
+                    
+                    {% if r.is_late %}
+                        <div class="badge bg-danger mt-1">Retraso</div>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if r.estado == 'CONFIRMADA' %}
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'cambiar_estado_reserva' r.id 'LLEGO' %}" class="btn btn-sm btn-primary">Llegó</a>
+                        <a href="{% url 'cambiar_estado_reserva' r.id 'CANCELADA' %}" class="btn btn-sm btn-outline-secondary">Cancelar</a>
+                    </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" class="text-center">Sin reservas para esta fecha.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
-
 {% endblock %}

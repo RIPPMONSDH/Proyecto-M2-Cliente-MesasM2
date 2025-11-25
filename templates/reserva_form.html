@@ -1,66 +1,65 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row justify-content-center mt-4">
-  <div class="col-md-8">
-    <div class="card">
-      <div class="card-header">
-        <h5 class="mb-0">Crear Reserva</h5>
-      </div>
-      <div class="card-body">
-        <form method="POST">
-          {% csrf_token %}
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label">Cliente</label>
-              <select name="cliente_id" class="form-select" required>
-                <option value="">-- Seleccionar cliente --</option>
-                {% for c in clientes %}
-                  <option value="{{ c.id }}">{{ c.nombre }} — {{ c.telefono }}</option>
-                {% endfor %}
-              </select>
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow border-0">
+            <div class="card-header bg-dark text-white py-3">
+                <h4 class="mb-0">Registrar Nueva Reserva</h4>
             </div>
-            <div class="col-md-3">
-              <label class="form-label">Fecha</label>
-              <input type="date" name="fecha" class="form-control" required value="{{ "now"|date:'Y-m-d' }}">
+            <div class="card-body p-4">
+                <form method="POST">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Cliente</label>
+                        {{ form.cliente }}
+                        <div class="form-text">Seleccione el cliente que reserva.</div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Fecha</label>
+                            {{ form.fecha }}
+                            <div class="text-danger small">{{ form.fecha.errors }}</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Hora Inicio</label>
+                            {{ form.hora_inicio }}
+                            <div class="text-danger small">{{ form.hora_inicio.errors }}</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Hora Fin</label>
+                            {{ form.hora_fin }}
+                            <div class="text-danger small">{{ form.hora_fin.errors }}</div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mt-2">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Cantidad Personas</label>
+                            {{ form.cantidad_personas }}
+                            <div class="text-danger small">{{ form.cantidad_personas.errors }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Mesa (Opcional)</label>
+                            {{ form.mesa_asignada }}
+                            <div class="form-text">Si se deja vacío, se asignará al llegar.</div>
+                            <div class="text-danger small">{{ form.mesa_asignada.errors }}</div>
+                        </div>
+                    </div>
+                    <div class="mb-3 mt-3">
+                        <label class="form-label fw-bold">Notas</label>
+                        {{ form.notas }}
+                    </div>
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">Confirmar Reserva</button>
+                        <a href="{% url 'listar_reservas' %}" class="btn btn-outline-secondary">Cancelar</a>
+                    </div>
+                </form>
             </div>
-            <div class="col-md-3">
-              <label class="form-label">Hora Inicio</label>
-              <input type="time" name="hora_inicio" class="form-control" required>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Hora Fin</label>
-              <input type="time" name="hora_fin" class="form-control" required>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Mesa (opcional)</label>
-              <select name="mesa_id" class="form-select">
-                <option value="">-- Sin asignar --</option>
-                {% for m in mesas %}
-                  <option value="{{ m.id }}">Mesa {{ m.numero }} ({{ m.ubicacion }})</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Cantidad de personas</label>
-              <input name="cantidad" class="form-control" value="1">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Estado</label>
-              <select name="estado" class="form-select">
-                <option value="CONFIRMADA">Confirmada</option>
-                <option value="LLEGO">Cliente Llegó</option>
-                <option value="CANCELADA">Cancelada</option>
-              </select>
-            </div>
-          </div>
-          <div class="mt-4 text-end">
-            <a href="{% url 'listar_reservas' %}" class="btn btn-outline-secondary me-2">Volver</a>
-            <button class="btn btn-primary">Crear Reserva</button>
-          </div>
-        </form>
-      </div>
+        </div>
     </div>
-  </div>
 </div>
 {% endblock %}

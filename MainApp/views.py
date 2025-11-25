@@ -1,34 +1,21 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.utils import timezone
-from django.db import transaction
-from datetime import timedelta
-from datetime import datetime
+from django.db.models import Q, Avg, Count, Sum
+from django.http import HttpResponse
+import csv
+from datetime import datetime, timedelta
 
-# Importaciones para API REST (Integración)
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from .serializers import MesaSerializer, ClienteSerializer, ReservaSerializer
+# Imports de API
+from rest_framework import viewsets
+from .serializers import MesaSerializer, ClienteSerializer, ReservaSerializer, HistorialOcupacionSerializer
+from .models import Cliente, Mesa, Reserva, HistorialOcupacion
+from .forms import ClienteForm, MesaForm, ReservaForm
 
-from .models import Cliente, Mesa, Reserva
-
-
-# Endpoint: api-mesas
+# --- API VIEWSETS (Esenciales para urls.py) ---
 class MesaViewSet(viewsets.ModelViewSet):
-    queryset = Mesa.objects.all().order_by('numero')
+    queryset = Mesa.objects.all()
     serializer_class = MesaSerializer
-
-    #  Asignar mesa (API para integración futura)
-    @action(detail=True, methods=['post'])
-    def cambiar_estado(self, request, pk=None):
-        mesa = self.get_object()
-        nuevo_estado = request.data.get('estado')
-        if nuevo_estado in dict(Mesa.ESTADOS):
-            mesa.estado = nuevo_estado
-            mesa.save()
-            return Response({'status': f'Mesa {mesa.numero} ahora está {mesa.estado}'})
-        return Response({'error': 'Estado inválido'}, status=status.HTTP_400_BAD_REQUEST)
 
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
@@ -38,303 +25,239 @@ class ReservaViewSet(viewsets.ModelViewSet):
     queryset = Reserva.objects.all()
     serializer_class = ReservaSerializer
 
-
-
-
-# Vista Principal --- Plano de Mesas 
+# --- Dashboard ---
 def home(request):
-    mesas = Mesa.objects.all().order_by('numero')
-    today = timezone.localtime(timezone.now()).date()
-    now_time = timezone.localtime(timezone.now()).time()
-    reservas_hoy = Reserva.objects.filter(
-        fecha=today
-    ).order_by('hora_inicio')
-
-    # reservas activas en este momento (inicio <= now < fin)
-    reservas_activas = reservas_hoy.filter(hora_inicio__lte=now_time, hora_fin__gt=now_time)
+    cap_min = request.GET.get('cap_min')
+    estado_filtro = request.GET.get('estado')
     
-    # Métricas para el dashboard 
-    libres = mesas.filter(estado='LIBRE').count()
-    total = mesas.count()
-    # Clientes recientes para facilitar la asignación desde el modal
-    clientes_recientes = Cliente.objects.all().order_by('-id')[:20]
+    # Excluir mesas "eliminadas" (Fuera de Servicio) del plano visual
+    mesas = Mesa.objects.exclude(estado='FUERA_SERVICIO').order_by('numero')
+    
+    if cap_min:
+        mesas = mesas.filter(capacidad__gte=cap_min)
+    if estado_filtro:
+        mesas = mesas.filter(estado=estado_filtro)
 
-    # también pasar las reservas del día para mostrarlas en las tarjetas de mesa
+    # Contadores
+    base = Mesa.objects.exclude(estado='FUERA_SERVICIO')
+    total = base.count()
+    libres = base.filter(estado='LIBRE').count()
+    ocupadas = base.filter(estado='OCUPADA').count()
+    reservadas = base.filter(estado='RESERVADA').count()
+    limpieza = base.filter(estado='LIMPIEZA').count()
+    
+    # Reservas Activas Ahora
+    ahora = timezone.localtime(timezone.now())
+    activas = Reserva.objects.filter(
+        fecha=ahora.date(), estado='CONFIRMADA',
+        hora_inicio__lte=ahora.time(), hora_fin__gte=ahora.time()
+    )
+    mapa_reservas = {r.mesa_asignada.id: r for r in activas if r.mesa_asignada}
+
     return render(request, 'home.html', {
-        'mesas': mesas,
-        'reservas': reservas_hoy,
-        'reservas_activas': reservas_activas,
-        'libres': libres,
-        'total': total,
-        'clientes': clientes_recientes,
+        'mesas': mesas, 
+        'total_mesas': total, 'mesas_libres': libres,
+        'mesas_ocupadas': ocupadas, 'mesas_reservadas': reservadas,
+        'mesas_limpieza': limpieza,
+        'mapa_reservas': mapa_reservas, 'ahora': ahora
     })
 
-# Registrar Cliente 
-def registrar_cliente(request):
+# --- Mesas ---
+def crear_mesa(request):
     if request.method == 'POST':
-        nombre = request.POST.get('nombre')
-        telefono = request.POST.get('telefono')
-        notas = request.POST.get('notas')
-        
-        if nombre and telefono:
-            try:
-                Cliente.objects.create(nombre=nombre, telefono=telefono, notas=notas)
-                messages.success(request, f'✅ Cliente {nombre} registrado correctamente.')
-                return redirect('lista_clientes')
-            except Exception as e:
-                messages.error(request, f'❌ Error: El teléfono ya existe o datos inválidos.')
-        else:
-            messages.error(request, '❌ Nombre y Teléfono son obligatorios.')
-            
-    return render(request, 'registrar_cliente.html')
+        form = MesaForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Mesa creada.')
+            return redirect('home')
+    else: form = MesaForm()
+    return render(request, 'mesa_form.html', {'form': form, 'titulo': 'Crear Mesa'})
 
+def editar_mesa(request, mesa_id):
+    mesa = get_object_or_404(Mesa, pk=mesa_id)
+    if request.method == 'POST':
+        form = MesaForm(request.POST, instance=mesa)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Actualizada.')
+            return redirect('home')
+    else: form = MesaForm(instance=mesa)
+    return render(request, 'mesa_form.html', {'form': form, 'titulo': 'Editar Mesa'})
+
+def eliminar_mesa(request, mesa_id):
+    mesa = get_object_or_404(Mesa, pk=mesa_id)
+    if mesa.estado in ['OCUPADA', 'RESERVADA']:
+        messages.error(request, 'No se puede eliminar una mesa activa (Ocupada/Reservada).')
+        return redirect('home')
+    if request.method == 'POST':
+        # Soft Delete
+        mesa.estado = 'FUERA_SERVICIO'
+        mesa.save()
+        messages.success(request, 'Mesa marcada como Fuera de Servicio.')
+        return redirect('home')
+    return render(request, 'mesa_confirm_delete.html', {'mesa': mesa})
+
+# --- Reservas ---
+def listar_reservas(request):
+    q_fecha = request.GET.get('fecha', str(timezone.localdate()))
+    reservas = Reserva.objects.filter(fecha=q_fecha).order_by('hora_inicio')
+    return render(request, 'reservas_list.html', {'reservas': reservas, 'fecha_filtro': q_fecha})
+
+def crear_reserva(request):
+    if request.method == 'POST':
+        form = ReservaForm(request.POST)
+        if form.is_valid():
+            reserva = form.save()
+            # Simulación Notificación
+            cliente = reserva.cliente
+            medios = []
+            if cliente.email: medios.append("Email")
+            if cliente.telefono: medios.append("SMS")
+            extra = f" (Notificado por {'/'.join(medios)})" if medios else ""
+            
+            messages.success(request, f'Reserva creada.{extra}')
+            
+            # Auto-reservar
+            ahora = timezone.localtime(timezone.now())
+            if reserva.mesa_asignada and reserva.fecha == ahora.date():
+                if reserva.hora_inicio <= ahora.time() <= reserva.hora_fin:
+                    if reserva.mesa_asignada.estado == 'LIBRE':
+                        reserva.mesa_asignada.estado = 'RESERVADA'
+                        reserva.mesa_asignada.save()
+            
+            return redirect('listar_reservas')
+    else: form = ReservaForm()
+    return render(request, 'reserva_form.html', {'form': form})
+
+def cambiar_estado_reserva(request, reserva_id, nuevo_estado):
+    reserva = get_object_or_404(Reserva, pk=reserva_id)
+    mesa = reserva.mesa_asignada
+    
+    if nuevo_estado == 'LLEGO':
+        reserva.estado = 'LLEGO'
+        reserva.save()
+        if mesa:
+            if mesa.estado == 'FUERA_SERVICIO':
+                 messages.warning(request, 'La mesa asignada está Fuera de Servicio.')
+            else:
+                mesa.estado = 'OCUPADA'
+                mesa.ultima_asignacion = timezone.now()
+                mesa.save()
+                HistorialOcupacion.objects.create(
+                    mesa=mesa, cliente=reserva.cliente,
+                    hora_entrada=timezone.now(), cantidad_personas=reserva.cantidad_personas
+                )
+            messages.success(request, 'Cliente llegó.')
+    
+    elif nuevo_estado == 'CANCELADA':
+        reserva.estado = 'CANCELADA'
+        reserva.save()
+        if mesa and mesa.estado == 'RESERVADA':
+            mesa.estado = 'LIBRE'
+            mesa.save()
+            messages.info(request, 'Reserva cancelada. Mesa liberada.')
+
+    return redirect('listar_reservas')
+
+# --- Clientes ---
 def lista_clientes(request):
-    query = request.GET.get('q')
-    if query:
-        # Búsqueda parcial por nombre o teléfono 
-        clientes = Cliente.objects.filter(nombre__icontains=query) | Cliente.objects.filter(telefono__icontains=query)
-    else:
-        clientes = Cliente.objects.all().order_by('-id')[:20]
-        
+    q = request.GET.get('q')
+    clientes = Cliente.objects.filter(Q(nombre__icontains=q)|Q(telefono__icontains=q)) if q else Cliente.objects.all()
     return render(request, 'lista_clientes.html', {'clientes': clientes})
 
+def registrar_cliente(request):
+    if request.method == 'POST':
+        form = ClienteForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('lista_clientes')
+    else: form = ClienteForm()
+    return render(request, 'registrar_cliente.html', {'form': form})
 
-# Mostrar mesas libres para asignar a un cliente específico
+def editar_cliente(request, pk):
+    cliente = get_object_or_404(Cliente, pk=pk)
+    if request.method == 'POST':
+        form = ClienteForm(request.POST, instance=cliente)
+        if form.is_valid():
+            form.save()
+            return redirect('lista_clientes')
+    else: form = ClienteForm(instance=cliente)
+    return render(request, 'registrar_cliente.html', {'form': form, 'editing': True})
+
+# --- Operaciones Mesa ---
 def elegir_mesa_para_cliente(request, cliente_id):
-    cliente = get_object_or_404(Cliente, id=cliente_id)
+    cliente = get_object_or_404(Cliente, pk=cliente_id)
     mesas_libres = Mesa.objects.filter(estado='LIBRE').order_by('numero')
     return render(request, 'elegir_mesa.html', {'cliente': cliente, 'mesas': mesas_libres})
 
-
-# Asignar una mesa concreta a un cliente (accionada por POST desde la lista de mesas libres)
-def asignar_cliente_mesa(request, cliente_id, mesa_id):
-    cliente = get_object_or_404(Cliente, id=cliente_id)
-    mesa = get_object_or_404(Mesa, id=mesa_id)
-
-    if request.method == 'POST':
-        if mesa.estado != 'LIBRE':
-            messages.error(request, '❌ La mesa no está libre.')
-            return redirect('elegir_mesa_para_cliente', cliente_id=cliente.id)
-
-        with transaction.atomic():
-            mesa.estado = 'OCUPADA'
-            mesa.save()
-
-            # Crear una reserva mínima: fecha = hoy, hora_inicio = ahora, hora_fin = ahora + 2 horas
-            inicio_dt = timezone.localtime(timezone.now())
-            fin_dt = inicio_dt + timedelta(hours=2)
-            Reserva.objects.create(
-                cliente=cliente,
-                mesa_asignada=mesa,
-                fecha=inicio_dt.date(),
-                hora_inicio=inicio_dt.time().replace(microsecond=0),
-                hora_fin=fin_dt.time().replace(microsecond=0),
-                cantidad_personas=1,
-                estado='LLEGO'
-            )
-
-        messages.success(request, f'✅ {cliente.nombre} asignado a Mesa {mesa.numero}.')
-        return redirect('lista_clientes')
-
-    return redirect('elegir_mesa_para_cliente', cliente_id=cliente.id)
-
-# Asignar Cliente a Mesa 
-def asignar_mesa(request, mesa_id):
-    mesa = get_object_or_404(Mesa, id=mesa_id)
-    
-    if request.method == 'POST':
-        # Puede venir de una reserva 
-        if mesa.estado == 'LIBRE':
-            mesa.estado = 'OCUPADA'
-            mesa.save()
-            
-            # AQUÍ INTEGRACIÓN FUTURA (SPRINT 3):
-            # Podrías llamar a la API de M3 para crear el pedido automáticamente
-            # requests.post('http://api-m3/crear_pedido', data={...})
-            
-            messages.success(request, f'✅ Mesa {mesa.numero} asignada. Estado: OCUPADA.')
-            return redirect('home')
-        else:
-            messages.error(request, '❌ La mesa no está libre.')
-            
-    return render(request, 'asignar_mesa.html', {'mesa': mesa})
-
-# Liberar Mesa 
-def liberar_mesa(request, mesa_id):
-    mesa = get_object_or_404(Mesa, id=mesa_id)
-    
-    if request.method == 'POST':
-        if mesa.estado == 'OCUPADA':
-            # Lógica de ciclo: Ocupada -> Limpieza (no se pasa automáticamente a Libre)
-            mesa.estado = 'LIMPIEZA'
-            mesa.save()
-            messages.info(request, f'🧹 Mesa {mesa.numero} enviada a LIMPIEZA. Marca limpieza completada cuando esté lista.')
-
-        return redirect('home')
-        
-    return render(request, 'confirmar_liberacion.html', {'mesa': mesa})
-
-
-def finalizar_limpieza(request, mesa_id):
-    mesa = get_object_or_404(Mesa, id=mesa_id)
-    if request.method == 'POST':
-        if mesa.estado == 'LIMPIEZA':
-            mesa.estado = 'LIBRE'
-            mesa.save()
-            messages.success(request, f'✅ Mesa {mesa.numero} ahora está LIBRE.')
-        else:
-            messages.error(request, 'La mesa no está en limpieza.')
-
-    return redirect('home')
-
-
-# Crear / Editar / Eliminar Mesas (UI básica)
-def crear_mesa(request):
-    if request.method == 'POST':
-        numero = request.POST.get('numero')
-        capacidad = request.POST.get('capacidad')
-        ubicacion = request.POST.get('ubicacion')
-        try:
-            mesa = Mesa.objects.create(numero=int(numero), capacidad=int(capacidad), ubicacion=ubicacion)
-            messages.success(request, f'✅ Mesa {mesa.numero} creada correctamente.')
-            return redirect('home')
-        except Exception as e:
-            messages.error(request, '❌ Error al crear la mesa. Verifica los datos.')
-
-    return render(request, 'mesa_form.html', {'mesa': None})
-
-
-def editar_mesa(request, mesa_id):
-    mesa = get_object_or_404(Mesa, id=mesa_id)
-    if request.method == 'POST':
-        mesa.numero = int(request.POST.get('numero'))
-        mesa.capacidad = int(request.POST.get('capacidad'))
-        mesa.ubicacion = request.POST.get('ubicacion')
-        mesa.save()
-        messages.success(request, f'✅ Mesa {mesa.numero} actualizada.')
-        return redirect('home')
-
-    return render(request, 'mesa_form.html', {'mesa': mesa})
-
-
-def eliminar_mesa(request, mesa_id):
-    mesa = get_object_or_404(Mesa, id=mesa_id)
-    if request.method == 'POST':
-        mesa.delete()
-        messages.success(request, f'✅ Mesa {mesa.numero} eliminada.')
-        return redirect('home')
-
-    return render(request, 'mesa_confirm_delete.html', {'mesa': mesa})
-
-
-# Cambiar estado de mesa (endpoint genérico con validación simple)
-def cambiar_estado_mesa(request, mesa_id):
-    mesa = get_object_or_404(Mesa, id=mesa_id)
-    if request.method == 'POST':
-        nuevo_estado = request.POST.get('estado')
-        estados_validos = dict(Mesa.ESTADOS).keys()
-        if nuevo_estado in estados_validos:
-            mesa.estado = nuevo_estado
-            mesa.save()
-            messages.success(request, f'✅ Mesa {mesa.numero} ahora está {mesa.get_estado_display()}.')
-        else:
-            messages.error(request, '❌ Estado inválido.')
-
-    return redirect('home')
-
-
-# Reservas: crear y listar con filtros
-def crear_reserva(request):
-    clientes = Cliente.objects.all().order_by('-id')[:50]
-    mesas = Mesa.objects.all().order_by('numero')
-
+def asignar_mesa_cliente(request, mesa_id):
+    mesa = get_object_or_404(Mesa, pk=mesa_id)
     if request.method == 'POST':
         cliente_id = request.POST.get('cliente_id')
-        fecha = request.POST.get('fecha')  # YYYY-MM-DD
-        hora_inicio = request.POST.get('hora_inicio')    # HH:MM
-        hora_fin = request.POST.get('hora_fin')    # HH:MM
-        mesa_id = request.POST.get('mesa_id')
-        cantidad = request.POST.get('cantidad') or 1
-        estado = request.POST.get('estado') or 'CONFIRMADA'
+        personas = int(request.POST.get('personas', 1))
+        if mesa.capacidad < personas:
+            messages.error(request, 'Capacidad insuficiente.')
+            return redirect('home')
+        
+        cliente = get_object_or_404(Cliente, pk=cliente_id)
+        mesa.estado = 'OCUPADA'
+        mesa.ultima_asignacion = timezone.now()
+        mesa.save()
+        HistorialOcupacion.objects.create(
+            mesa=mesa, cliente=cliente,
+            hora_entrada=timezone.now(), cantidad_personas=personas
+        )
+        messages.success(request, 'Mesa asignada.')
+        return redirect('home')
+    clientes = Cliente.objects.all()
+    return render(request, 'asignar_mesa.html', {'mesa': mesa, 'clientes': clientes})
 
-        try:
-            cliente = get_object_or_404(Cliente, id=int(cliente_id))
-            # Parsear inicio y fin
-            # Parsear fecha y horas
-            fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
-            hora_inicio_obj = datetime.strptime(hora_inicio, "%H:%M").time()
-            hora_fin_obj = datetime.strptime(hora_fin, "%H:%M").time()
+def liberar_mesa(request, mesa_id):
+    mesa = get_object_or_404(Mesa, pk=mesa_id)
+    if request.method == 'POST':
+        h = HistorialOcupacion.objects.filter(mesa=mesa, hora_salida__isnull=True).last()
+        if h:
+            h.hora_salida = timezone.now()
+            h.consumo_total = 0 
+            h.save()
+        mesa.estado = 'LIMPIEZA'
+        mesa.save()
+        return redirect('home')
+    return render(request, 'confirmar_liberacion.html', {'mesa': mesa})
 
-            # Validaciones
-            hoy = timezone.localtime(timezone.now()).date()
-            if fecha_obj < hoy:
-                messages.error(request, '❌ La fecha de la reserva no puede ser en el pasado.')
-                return render(request, 'reserva_form.html', {'clientes': clientes, 'mesas': mesas})
-            if hora_fin_obj <= hora_inicio_obj:
-                messages.error(request, '❌ La hora de fin debe ser posterior a la hora de inicio.')
-                return render(request, 'reserva_form.html', {'clientes': clientes, 'mesas': mesas})
+def finalizar_limpieza(request, mesa_id):
+    mesa = get_object_or_404(Mesa, pk=mesa_id)
+    if request.method == 'POST':
+        mesa.estado = 'LIBRE'
+        mesa.save()
+    return redirect('home')
 
-            mesa_obj = None
-            if mesa_id:
-                mesa_obj = get_object_or_404(Mesa, id=int(mesa_id))
+# --- Reportes ---
+def ver_historial_mesa(request, mesa_id):
+    mesa = get_object_or_404(Mesa, pk=mesa_id)
+    ocupaciones = HistorialOcupacion.objects.filter(mesa=mesa).order_by('-hora_entrada')
+    total = ocupaciones.count()
+    cerradas = [o for o in ocupaciones if o.hora_salida]
+    
+    prom_min = sum([o.duracion_minutos for o in cerradas]) / len(cerradas) if cerradas else 0
+    total_consumo = sum([o.consumo_total for o in ocupaciones])
+    prom_consumo = total_consumo / total if total > 0 else 0
 
-            Reserva.objects.create(
-                cliente=cliente,
-                mesa_asignada=mesa_obj,
-                fecha=fecha_obj,
-                hora_inicio=hora_inicio_obj,
-                hora_fin=hora_fin_obj,
-                cantidad_personas=int(cantidad),
-                estado=estado
-            )
-
-            # Si la reserva es para HOY y se asignó una mesa libre, marcarla como RESERVADA
-            if mesa_obj and fecha_obj == hoy:
-                if mesa_obj.estado == 'LIBRE':
-                    mesa_obj.estado = 'RESERVADA'
-                    mesa_obj.save()
-                    messages.info(request, f'ℹ️ Mesa {mesa_obj.numero} marcada como RESERVADA para hoy.')
-
-            # Si la reserva indica que el cliente ya llegó, marcar la mesa como OCUPADA
-            if estado == 'LLEGO' and mesa_obj:
-                mesa_obj.estado = 'OCUPADA'
-                mesa_obj.save()
-                messages.info(request, f'ℹ️ Mesa {mesa_obj.numero} marcada como OCUPADA (cliente llegó).')
-
-            messages.success(request, '✅ Reserva creada correctamente.')
-            return redirect('listar_reservas')
-        except Exception as e:
-            messages.error(request, '❌ Error al crear la reserva. Revisa los datos.')
-
-    return render(request, 'reserva_form.html', {'clientes': clientes, 'mesas': mesas})
-
-
-def listar_reservas(request):
-    # filtros: fecha, cliente, estado
-    q_fecha = request.GET.get('fecha')
-    q_cliente = request.GET.get('cliente')
-    q_estado = request.GET.get('estado')
-
-    reservas = Reserva.objects.all().order_by('-fecha', '-hora_inicio')
-    if q_fecha:
-        try:
-            fecha_obj = datetime.strptime(q_fecha, "%Y-%m-%d").date()
-            reservas = reservas.filter(fecha=fecha_obj)
-        except Exception:
-            pass
-    else:
-        # por defecto mostrar reservas del día actual
-        reservas = reservas.filter(fecha=timezone.now().date())
-
-    if q_cliente:
-        reservas = reservas.filter(cliente__id=q_cliente)
-    if q_estado:
-        reservas = reservas.filter(estado=q_estado)
-
-    clientes = Cliente.objects.all().order_by('nombre')[:200]
-
-    return render(request, 'reservas_list.html', {
-        'reservas': reservas,
-        'clientes': clientes,
-        'filtros': {'fecha': q_fecha, 'cliente': q_cliente, 'estado': q_estado}
+    return render(request, 'historial_mesa.html', {
+        'mesa': mesa, 'ocupaciones': ocupaciones,
+        'metricas': {'rotacion': total, 'promedio': round(prom_min, 1), 'consumo_prom': round(prom_consumo, 1)}
     })
+
+def exportar_historial_csv(request, mesa_id):
+    mesa = get_object_or_404(Mesa, pk=mesa_id)
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="historial_{mesa.numero}.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['Fecha', 'Cliente', 'Entrada', 'Salida', 'Min', 'Pax', 'Consumo'])
+    for o in HistorialOcupacion.objects.filter(mesa=mesa):
+        writer.writerow([
+            o.fecha, o.cliente.nombre if o.cliente else 'Walk-in',
+            o.hora_entrada.strftime("%H:%M"), o.hora_salida.strftime("%H:%M") if o.hora_salida else '-',
+            o.duracion_minutos, o.cantidad_personas, o.consumo_total
+        ])
+    return response

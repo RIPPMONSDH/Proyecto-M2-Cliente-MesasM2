@@ -3,37 +3,112 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-6">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="bi bi-person-plus-fill"></i> Registrar Nuevo Cliente</h4>
+        <div class="card shadow border-0">
+            <div class="card-header bg-primary text-white py-3">
+                <h4 class="mb-0">
+                    <i class="bi bi-person-badge"></i> 
+                    {% if editing %}Editar Cliente{% else %}Registrar Nuevo Cliente{% endif %}
+                </h4>
             </div>
-            <div class="card-body p-4">
-                <form method="POST">
+            <div class="card-body p-4 bg-white">
+                <form method="POST" id="clienteForm">
                     {% csrf_token %}
                     
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-circle"></i> {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+
+                    <!-- Campos manuales para control total del layout -->
                     <div class="mb-3">
-                        <label for="nombre" class="form-label">Nombre Completo *</label>
-                        <input type="text" class="form-control" id="nombre" name="nombre" required placeholder="Ej: Juan Pérez">
+                        <label class="form-label fw-bold">Nombre Completo</label>
+                        {{ form.nombre }}
+                        <div class="text-danger small">{{ form.nombre.errors }}</div>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="telefono" class="form-label">Teléfono *</label>
-                        <input type="tel" class="form-control" id="telefono" name="telefono" required placeholder="+56 9 1234 5678">
-                        <div class="form-text">Debe ser único en el sistema.</div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Teléfono</label>
+                            {{ form.telefono }}
+                            <div class="text-danger small">{{ form.telefono.errors }}</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Email</label>
+                            {{ form.email }}
+                            <div class="text-danger small">{{ form.email.errors }}</div>
+                        </div>
                     </div>
 
                     <div class="mb-3">
-                        <label for="notas" class="form-label">Notas / Preferencias</label>
-                        <textarea class="form-control" id="notas" name="notas" rows="3" placeholder="Ej: Alérgico a las nueces, prefiere terraza..."></textarea>
+                        <label class="form-label fw-bold">Fecha de Nacimiento</label>
+                        {{ form.fecha_nacimiento }}
+                        <div class="text-danger small">{{ form.fecha_nacimiento.errors }}</div>
                     </div>
 
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary btn-lg">Guardar Cliente</button>
-                        <a href="{% url 'lista_clientes' %}" class="btn btn-secondary">Cancelar</a>
+                    <hr>
+                    <h6 class="text-muted mb-3">Información Adicional</h6>
+
+                    <!-- Preferencias con lógica JS -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Preferencias Alimentarias</label>
+                        {{ form.preferencias }} <!-- ID: select-preferencia -->
+                        <div class="text-danger small">{{ form.preferencias.errors }}</div>
+                    </div>
+
+                    <div class="mb-3" id="div-detalle_preferencia" style="display: none;">
+                        <label class="form-label fw-bold text-primary">Especifique 'Otro'</label>
+                        {{ form.detalle_preferencia }} <!-- ID: input-detalle-preferencia -->
+                        <div class="text-danger small">{{ form.detalle_preferencia.errors }}</div>
+                        <div class="form-text">Por favor ingrese el detalle de la preferencia.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Observaciones / Notas</label>
+                        {{ form.notas }}
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-save"></i> Guardar Cliente
+                        </button>
+                        <a href="{% url 'lista_clientes' %}" class="btn btn-outline-secondary">Cancelar</a>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Lógica para mostrar/ocultar detalle de preferencia -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectPref = document.getElementById('select-preferencia');
+        const divDetalle = document.getElementById('div-detalle_preferencia');
+        const inputDetalle = document.getElementById('input-detalle-preferencia');
+
+        function toggleDetalle() {
+            if (!selectPref) return;
+
+            if (selectPref.value === 'OTRO') {
+                divDetalle.style.display = 'block';
+                inputDetalle.required = true; 
+                // Animación simple de entrada
+                divDetalle.classList.add('animate__animated', 'animate__fadeIn');
+            } else {
+                divDetalle.style.display = 'none';
+                inputDetalle.required = false;
+                // Opcional: limpiar valor si se oculta
+                // inputDetalle.value = ''; 
+            }
+        }
+
+        if (selectPref) {
+            // Ejecutar al cargar (por si viene de un error de validación)
+            toggleDetalle();
+            // Ejecutar al cambiar
+            selectPref.addEventListener('change', toggleDetalle);
+        }
+    });
+</script>
 {% endblock %}

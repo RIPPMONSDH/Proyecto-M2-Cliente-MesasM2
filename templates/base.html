@@ -3,43 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Mesas - Módulo 2</title>
+    <title>M2 - Gestión de Mesas</title>
+    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
     <style>
-        .mesa-card { transition: transform 0.2s; cursor: pointer; }
-        .mesa-card:hover { transform: scale(1.05); }
-        /* Colores de estado según */
-        .bg-libre { background-color: #198754 !important; color: white; } /* Verde */
-        .bg-ocupada { background-color: #dc3545 !important; color: white; } /* Rojo */
-        .bg-reservada { background-color: #ffc107 !important; color: black; } /* Amarillo */
-        .bg-limpieza { background-color: #0dcaf0 !important; color: black; } /* Azul */
+        body { background-color: #f8f9fa; }
+        .mesa-card { 
+            height: 180px; 
+            transition: all 0.2s; 
+            border: 2px solid transparent; 
+        }
+        .mesa-card:hover { 
+            transform: translateY(-5px); 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1); 
+        }
+        
+        /* Estados de Mesa */
+        .estado-LIBRE { background-color: #d1e7dd; border-color: #198754; color: #0f5132; }
+        .estado-OCUPADA { background-color: #f8d7da; border-color: #dc3545; color: #842029; }
+        .estado-RESERVADA { background-color: #fff3cd; border-color: #ffc107; color: #664d03; }
+        .estado-LIMPIEZA { background-color: #cff4fc; border-color: #0dcaf0; color: #055160; }
+        
+        .navbar-brand { font-weight: bold; letter-spacing: 1px; }
+        .card { border-radius: 12px; }
     </style>
 </head>
-<body class="bg-light">
-
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 sticky-top shadow">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'home' %}">🍽️ Host Service (M2)</a>
+            <a class="navbar-brand" href="{% url 'home' %}">
+                <i class="bi bi-shop-window"></i> Restaurante M2
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Plano de Mesas</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'lista_clientes' %}">Clientes</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{% url 'registrar_cliente' %}">Registrar Nuevo</a></li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'home' %}"><i class="bi bi-grid-3x3"></i> Plano</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'lista_clientes' %}"><i class="bi bi-people"></i> Clientes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'listar_reservas' %}"><i class="bi bi-calendar-check"></i> Reservas</a>
+                    </li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <div class="container">
+    <div class="container main-content pb-5">
+        <!-- Bloque de Mensajes (Alertas) -->
         {% if messages %}
             {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                    {% if message.tags == 'success' %}<i class="bi bi-check-circle-fill me-2"></i>{% endif %}
+                    {% if message.tags == 'error' %}<i class="bi bi-exclamation-triangle-fill me-2"></i>{% endif %}
                     {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
             {% endfor %}
         {% endif %}
@@ -47,6 +72,7 @@
         {% block content %}{% endblock %}
     </div>
 
+    <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
