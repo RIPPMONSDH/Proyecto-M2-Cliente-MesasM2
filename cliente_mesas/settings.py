@@ -24,12 +24,15 @@ STATIC_DIR = os.path.join(BASE_DIR, 'static')
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-^nu&9vc3+a@n!u30e%ek^470%ttfzg(v-3x1o=u!3x9m30$tum'
+# Read SECRET_KEY from environment to avoid committing secrets to the repo.
+# If not provided, fall back to an unsafe local default (only for local dev).
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'unsafe-local-secret')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Read DEBUG and ALLOWED_HOSTS from environment for production compatibility
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if os.environ.get('DJANGO_ALLOWED_HOSTS') else []
 
 
 # Application definition
@@ -48,6 +51,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -124,9 +128,25 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [STATIC_DIR]
 
+# Static root for collectstatic (production)
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# WhiteNoise static files storage (production)
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 MEDIA_DIR = 'media/'
 MEDIA_ROOT = MEDIA_DIR
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Production database configuration via DATABASE_URL (e.g. postgres).
+try:
+    import dj_database_url
+except Exception:
+    dj_database_url = None
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL and dj_database_url is not None:
+    DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
